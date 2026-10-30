@@ -239,7 +239,45 @@ notifications via the `agent.config` `notify` signal.
 
 ---
 
-## 7. Data Manager (`datamanager`) — store and forward
+## 7. How the tree is reached (protocols)
+
+The `treemgr` API itself is **in-process Lua**. Applications and the server reach the tree over the wire through
+three different transports — and EMP is the one used by on-device asset applications.
+
+### EMP — asset applications ⇄ agent
+
+Asset applications (via the `devicetree` / AirVantage client library) talk to the agent's Asset Connector
+(`agent.asscon`) using the **Embedded Micro Protocol (EMP)**. `agent/devman/init.lua` registers thin EMP wrappers
+over `treemgr`:
+
+| EMP command | Direction | `treemgr` call |
+|---|---|---|
+| `GetVariable` | App → Agent | `treemgr.get(path)` |
+| `SetVariable` | App → Agent | `treemgr.set(path, value)` |
+| `RegisterVariable` | App → Agent | `treemgr.register(regvars, hook, passivevars)` → returns a registration id |
+| `NotifyVariable` | Agent → App | change notification delivered to the registered hook |
+| `UnregisterVariable` | App → Agent | `treemgr.unregister(id)` (the doc names it `DeRegisterVariable`) |
+
+So the full **set / get / register / unregister / notify** cycle runs over EMP: `RegisterVariable` registers a
+hook that, on change, re-sends the changed-variable map back to the app as a `NotifyVariable` EMP message
+(`agent/devman/init.lua`).
+
+### M3DA — server ⇄ agent
+
+The remote server does **not** speak EMP. It reads the tree with the **M3DA** `ReadNode` command
+(`agent/devman/cmds/ReadNode.lua`, which walks `treemgr.get` and pushes data back) and writes values with a data
+write (`treemgr.set`). Persisted configuration is addressed under `@sys.config`.
+
+### REST — `GET` / `PUT /devicetree/...`
+
+When `rest.activate` is set, `agent/devman/init.lua` additionally mirrors `get`/`set` over HTTP at
+`/devicetree/<path>`.
+
+> There is no separate "delete" command: un-registering change notifications is `UnregisterVariable`, and
+> clearing a stored value is done by setting it to `nil` (`niltoken`). The Data Manager (§8) uses a *different*
+> set of EMP messages (`PData`, `PFlush`, `TableNew`, …) for store-and-forward records.
+
+## 8. Data Manager (`datamanager`) — store and forward
 
 Complements the tree store for data that must reach a server. `agent.asscon.datamanager` receives EMP
 (Embedded Micro Protocol) messages from asset applications (`PData`, `PFlush`, `PAcknowledge`, `TableNew`,
@@ -255,7 +293,7 @@ Data is grouped under named **policies** (e.g. `default`, `now`, `never`, `on_bo
 
 ---
 
-## 8. Source map
+## 9. Source map
 
 ```
 agent/agent/
@@ -275,7 +313,7 @@ luafwk/log/log_store.*    # C log storage
 
 ---
 
-## 9. License & provenance
+## 10. License & provenance
 
 - **License:** Eclipse Public License v1.0 (`http://www.eclipse.org/legal/epl-v10.html`).
 - **Copyright:** © 2012 Sierra Wireless and others.
