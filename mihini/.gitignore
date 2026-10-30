@@ -1,0 +1,9 @@
+build.*
+*~
+#*
+scratch
+.project
+.cproject
+.buildpath
+bin/lua
+build_version
