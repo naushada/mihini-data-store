@@ -293,7 +293,103 @@ Data is grouped under named **policies** (e.g. `default`, `now`, `never`, `on_bo
 
 ---
 
-## 9. Source map
+## 9. Examples
+
+The APIs split cleanly by *where* they run: `devicetree` and `airvantage` run **in an asset application**
+(speaking EMP to the agent), while `treemgr` and `agent.config` run **inside the agent** (in-process Lua).
+
+### 9.1 From an asset application — `devicetree` (over EMP)
+
+Every call below is an EMP message to the agent (`GetVariable`/`SetVariable`/`RegisterVariable`/
+`UnregisterVariable`), and change notifications arrive back as `NotifyVariable`.
+
+```lua
+local dt = require 'devicetree'
+dt.init()
+
+-- Read a leaf value
+local fw = dt.get("system.sw_info.fw_ver")            -- e.g. "4.2.5"
+
+-- Read a subtree: a non-leaf node returns nil + its direct children
+local value, children = dt.get("system.sw_info")      -- value=nil,
+                                                      -- children={"system.sw_info.fw_ver", ...}
+
+-- Write a single value
+dt.set("config.monitoring.activate", true)
+
+-- Write a whole subtree in one call (value can be a key/value table)
+dt.set("ram", { counter = 0, label = "boot" })
+
+-- Register a change notification
+local id = dt.register(
+    "system.gps.latitude",                            -- variable(s) to monitor
+    function(changes) print("GPS changed:", changes) end,  -- callback gets a path->value map
+    "system.gps.longitude"                            -- passive var: reported even if unchanged
+)
+
+-- Unsubscribe later
+dt.unregister(id)
+```
+
+### 9.2 Inside the agent — `treemgr` (in-process Lua)
+
+Same semantics as `devicetree`, but called directly inside the agent process (no wire protocol):
+
+```lua
+local treemgr = require 'agent.treemgr'
+
+treemgr.set("ram.counter", 42)
+local v = treemgr.get("ram.counter")                  -- 42
+
+-- Set several values at once (prefix + relative keys, or absolute paths)
+treemgr.set("ram", { counter = 43, label = "hello" })
+treemgr.set{ ["ram.counter"] = 44, ["ram.label"] = "world" }
+
+-- Register a change hook, then unregister it
+local hook = treemgr.register(
+    "ram.counter",
+    function(lmap) print("counter is now", lmap["ram.counter"]) end
+)
+treemgr.unregister(hook)
+```
+
+### 9.3 Agent configuration — `agent.config`
+
+The persisted Config Store is exposed as nested Lua tables (a proxy over the `config` subtree) plus an
+explicit API:
+
+```lua
+local config = require 'agent.config'
+
+-- Nested-table access (reads/writes go through treemgr)
+print(config.mediation.timeout)
+config.mediation.activate = false
+
+-- Explicit API
+config.set("network.activate", true)
+local v = config.get("network.bearerpriority")
+config.default("mediation")    -- reload the 'mediation' subtree from defaultconfig.lua
+config.pdiff("")               -- pretty-print values that differ from the defaults
+```
+
+### 9.4 Push data to the server — `airvantage` (store-and-forward)
+
+Separate from the tree: `asset:pushData` buffers records (EMP `PData`), and a policy flush sends them:
+
+```lua
+local airvantage = require 'airvantage'
+airvantage.init()
+
+local asset = airvantage.newAsset("sensor1")
+asset:start()
+
+asset:pushData("temperature", { value = 23.5, unit = "C" }, "now")
+-- → sends <assetroot>.temperature.value and <assetroot>.temperature.unit
+
+airvantage.triggerPolicy("now")   -- flush the 'now' policy immediately
+```
+
+## 10. Source map
 
 ```
 agent/agent/
@@ -313,7 +409,7 @@ luafwk/log/log_store.*    # C log storage
 
 ---
 
-## 10. License & provenance
+## 11. License & provenance
 
 - **License:** Eclipse Public License v1.0 (`http://www.eclipse.org/legal/epl-v10.html`).
 - **Copyright:** © 2012 Sierra Wireless and others.
