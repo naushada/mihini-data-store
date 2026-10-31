@@ -3,8 +3,9 @@
 --
 -- A module config schema (see openvpn/client/config.lua for the canonical shape)
 -- must declare:
---     config.enabled   boolean  the start/stop knob (persisted in flash)
---     state.running    boolean  actual status, written by this supervisor
+--     config.enabled            boolean  the start/stop knob (persisted in flash)
+--     state.running             boolean  actual status, written by this supervisor
+--     state.started_timestamp   integer  last successful start (unix epoch; 0 = down)
 -- (plus any other operational state leafs, e.g. pid / last_error) and a top-level
 -- `unit` (systemd unit name) + `namespace` (dot path under config/state).
 --
@@ -44,10 +45,11 @@ function M.start(models, treemgr)
     local stops = {}
 
     for _, model in ipairs(models) do
-        local unit = model.unit or ((model.namespace or "module") .. ".service")
-        local knob = model:config_path("enabled")
-        local run  = model:state_path("running")
-        local err  = model:state_path("last_error")
+        local unit    = model.unit or ((model.namespace or "module") .. ".service")
+        local knob    = model:config_path("enabled")
+        local run     = model:state_path("running")
+        local started = model:state_path("started_timestamp")
+        local err     = model:state_path("last_error")
 
         -- defaults + operational-state init + the config -> state reference
         local mirror = model:apply(treemgr)
@@ -56,7 +58,9 @@ function M.start(models, treemgr)
         local function apply(enabled)
             local what = "systemctl " .. (enabled and "start" or "stop") .. " " .. unit
             local ok = run_cmd(what)
-            treemgr.set(run, ok and enabled or false)
+            local running = ok and enabled or false
+            treemgr.set(run, running)
+            treemgr.set(started, running and os.time() or 0)
             treemgr.set(err, ok and "" or (what .. " failed"))
         end
 

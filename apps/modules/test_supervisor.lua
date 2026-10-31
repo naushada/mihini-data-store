@@ -69,6 +69,10 @@ os.execute = function(cmd)
     return 0
 end
 
+-- fixed wall clock so started_timestamp assertions are deterministic
+local fixed_now = 1700000000
+os.time = function() return fixed_now end
+
 local function contains(needle)
     for _, cmd in ipairs(executed) do
         if cmd:find(needle, 1, true) then return true end
@@ -121,6 +125,7 @@ check(tm.get("state.openvpn.server.subnet") == "10.8.0.0",
 -- operational-only state leafs (no config counterpart), initialised from defaults
 check(tm.get("state.openvpn.client.running") == false, "init: state.openvpn.client.running == false")
 check(tm.get("state.openvpn.client.pid") == 0,           "init: state.openvpn.client.pid == 0")
+check(tm.get("state.openvpn.client.started_timestamp") == 0, "init: state.openvpn.client.started_timestamp == 0")
 check(tm.get("state.openvpn.client.last_error") == "",   "init: state.openvpn.client.last_error == ''")
 check(tm.get("state.lwm2m.server.running") == false,     "init: state.lwm2m.server.running == false")
 
@@ -133,18 +138,21 @@ check(contains("systemctl stop cellular.service"),       "boot pass stops cellul
 tm.set("config.openvpn.client.enabled", true)
 check(contains("systemctl start openvpn-client.service"), "knob on -> systemctl start openvpn-client")
 check(tm.get("state.openvpn.client.running") == true,     "knob on -> state.openvpn.client.running == true")
+check(tm.get("state.openvpn.client.started_timestamp") == fixed_now, "knob on -> started_timestamp recorded")
 check(tm.get("state.openvpn.client.enabled") == true,     "knob on -> state.enabled mirrors config.enabled")
 check(tm.get("state.openvpn.client.last_error") == "",    "knob on -> last_error cleared")
 
 -- live knob -> stop
 tm.set("config.openvpn.client.enabled", false)
 check(tm.get("state.openvpn.client.running") == false,    "knob off -> state.openvpn.client.running == false")
+check(tm.get("state.openvpn.client.started_timestamp") == 0, "knob off -> started_timestamp cleared")
 check(contains("systemctl stop openvpn-client.service"),  "knob off -> systemctl stop openvpn-client")
 
 -- failed start -> running stays false, last_error records it
 os.execute = function(cmd) executed[#executed + 1] = cmd; return 1 end
 tm.set("config.openvpn.client.enabled", true)
 check(tm.get("state.openvpn.client.running") == false,    "failed start -> running stays false")
+check(tm.get("state.openvpn.client.started_timestamp") == 0, "failed start -> started_timestamp stays 0")
 check(tm.get("state.openvpn.client.last_error") ~= "",    "failed start -> last_error populated")
 os.execute = function(cmd) executed[#executed + 1] = cmd; return 0 end
 

@@ -14,8 +14,9 @@ return {
     },
 
     state = {
-        running    = { type = "boolean", default = false },
-        pid        = { type = "integer", default = 0 },
-        last_error = { type = "string",  default = "" },
+        running           = { type = "boolean", default = false },
+        pid               = { type = "integer", default = 0 },
+        started_timestamp = { type = "integer", default = 0 },
+        last_error        = { type = "string",  default = "" },
     },
 }

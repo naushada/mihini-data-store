@@ -19,9 +19,10 @@ return {
         proto   = { type = "string",  default = "udp", enum = { "udp", "tcp" } },
     },
 
-    state = {                                                     -- operational (config false)
-        running    = { type = "boolean", default = false },       -- actual, by supervisor
-        pid        = { type = "integer", default = 0 },
-        last_error = { type = "string",  default = "" },
+    state = {                                                       -- operational (config false)
+        running           = { type = "boolean", default = false },  -- actual, by supervisor
+        pid               = { type = "integer", default = 0 },
+        started_timestamp = { type = "integer", default = 0 },
+        last_error        = { type = "string",  default = "" },
     },
 }
