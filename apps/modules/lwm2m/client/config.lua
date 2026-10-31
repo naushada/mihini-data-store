@@ -10,6 +10,7 @@ return {
     namespace = "lwm2m.client",
     unit = "lwm2m-client.service",
     store = "flash",
+    mirror = true,
 
     config = {
         enabled  = { type = "boolean", default = false },         -- start/stop knob
@@ -38,6 +39,8 @@ return {
     },
 
     state = {
-        running = { type = "boolean", default = false },          -- actual, by supervisor
+        running    = { type = "boolean", default = false },
+        pid        = { type = "integer", default = 0 },
+        last_error = { type = "string",  default = "" },
     },
 }

@@ -3,9 +3,10 @@
 --
 --     luajit apps/modules/test_supervisor.lua
 --
--- Exercises: default application over namespaced/nested configs, state.running
--- initialisation, the boot-time autostart pass, and live knob -> systemctl
--- start/stop on change.
+-- Exercises: default application over namespaced/nested configs, the YANG-style
+-- config -> state reference (mirror = true) plus the extra operational state
+-- leafs, state.running initialisation, the boot-time autostart pass, and live
+-- knob -> systemctl start/stop on change.
 
 local this_dir = arg[0]:match("^(.*)/[^/]+$") or "."
 package.path = (this_dir .. "/../../?.lua;" .. this_dir .. "/../../?/init.lua;") .. package.path
@@ -110,24 +111,42 @@ check(tm.get("config.lwm2m.client.psk.id") == "iot-client", "default: lwm2m.clie
 check(tm.get("config.lwm2m.server.bs.security.mode") == "PSK", "default: lwm2m.server bs.security.mode == PSK")
 check(tm.get("config.lwm2m.server.dm.psk.id") == "iot-dm-client", "default: lwm2m.server dm.psk.id")
 
--- state.running initialised for every module
+-- YANG reference: every config leaf is mirrored into state.* (mirror = true)
+check(tm.get("state.openvpn.client.enabled") == false, "reference: state.openvpn.client.enabled == config")
+check(tm.get("state.lwm2m.client.dm.uri") == "coaps://leshan.eclipseprojects.io:5684",
+      "reference: state.lwm2m.client.dm.uri mirrors config")
+check(tm.get("state.openvpn.server.subnet") == "10.8.0.0",
+      "reference: state.openvpn.server.subnet mirrors config")
+
+-- operational-only state leafs (no config counterpart), initialised from defaults
 check(tm.get("state.openvpn.client.running") == false, "init: state.openvpn.client.running == false")
-check(tm.get("state.lwm2m.server.running") == false, "init: state.lwm2m.server.running == false")
+check(tm.get("state.openvpn.client.pid") == 0,           "init: state.openvpn.client.pid == 0")
+check(tm.get("state.openvpn.client.last_error") == "",   "init: state.openvpn.client.last_error == ''")
+check(tm.get("state.lwm2m.server.running") == false,     "init: state.lwm2m.server.running == false")
 
 -- boot pass: default enabled=false -> systemctl stop each unit (harmless no-op)
 check(contains("systemctl stop openvpn-client.service"), "boot pass stops openvpn-client")
 check(contains("systemctl stop lwm2m-client.service"),   "boot pass stops lwm2m-client")
 check(contains("systemctl stop cellular.service"),       "boot pass stops cellular")
 
--- live knob -> start
+-- live knob -> start (mirror tracks config.enabled, supervisor writes running)
 tm.set("config.openvpn.client.enabled", true)
 check(contains("systemctl start openvpn-client.service"), "knob on -> systemctl start openvpn-client")
 check(tm.get("state.openvpn.client.running") == true,     "knob on -> state.openvpn.client.running == true")
+check(tm.get("state.openvpn.client.enabled") == true,     "knob on -> state.enabled mirrors config.enabled")
+check(tm.get("state.openvpn.client.last_error") == "",    "knob on -> last_error cleared")
 
 -- live knob -> stop
 tm.set("config.openvpn.client.enabled", false)
 check(tm.get("state.openvpn.client.running") == false,    "knob off -> state.openvpn.client.running == false")
 check(contains("systemctl stop openvpn-client.service"),  "knob off -> systemctl stop openvpn-client")
+
+-- failed start -> running stays false, last_error records it
+os.execute = function(cmd) executed[#executed + 1] = cmd; return 1 end
+tm.set("config.openvpn.client.enabled", true)
+check(tm.get("state.openvpn.client.running") == false,    "failed start -> running stays false")
+check(tm.get("state.openvpn.client.last_error") ~= "",    "failed start -> last_error populated")
+os.execute = function(cmd) executed[#executed + 1] = cmd; return 0 end
 
 -- stop() unregisters cleanly (no error) and later changes are inert
 h:stop()

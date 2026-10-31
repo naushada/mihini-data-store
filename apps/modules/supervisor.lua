@@ -5,14 +5,16 @@
 -- must declare:
 --     config.enabled   boolean  the start/stop knob (persisted in flash)
 --     state.running    boolean  actual status, written by this supervisor
--- and a top-level `unit` (systemd unit name) + `namespace` (dot path under
--- config/state, e.g. "openvpn.client" -> config.openvpn.client.enabled).
+-- (plus any other operational state leafs, e.g. pid / last_error) and a top-level
+-- `unit` (systemd unit name) + `namespace` (dot path under config/state).
 --
--- The supervisor runs inside the agent. It applies each module's defaults, then
--- watches the `enabled` knob: setting it true runs `systemctl start <unit>`,
--- setting it false runs `systemctl stop <unit>`, and the result is mirrored into
--- `state.<namespace>.running`. A knob that was persisted true is re-applied at
--- boot, giving autostart across reboots.
+-- The supervisor runs inside the agent. For each module it calls model:apply(),
+-- which applies config defaults, initialises the operational state leafs, and
+-- starts the config -> state reference (`mirror = true`, so every config leaf is
+-- also visible under state.<namespace>.*). It then watches the `enabled` knob:
+-- setting it true runs `systemctl start <unit>`, false runs `systemctl stop`, and
+-- the result is mirrored into `state.<namespace>.running` / `.last_error`. A knob
+-- persisted true is re-applied at boot, giving autostart across reboots.
 
 local schema = require 'schema'
 
@@ -39,40 +41,39 @@ function M.start(models, treemgr)
     models = models or load_modules()
     treemgr = treemgr or require 'agent.treemgr'
 
-    local handles = {}
+    local stops = {}
 
     for _, model in ipairs(models) do
         local unit = model.unit or ((model.namespace or "module") .. ".service")
         local knob = model:config_path("enabled")
         local run  = model:state_path("running")
+        local err  = model:state_path("last_error")
 
-        model:apply_defaults(treemgr)
-
-        -- initialise operational state to its declared defaults
-        local init = {}
-        model:each_state_leaf(function(rel, spec)
-            if spec.default ~= nil then init[model:state_path(rel)] = spec.default end
-        end)
-        if next(init) then treemgr.set(init) end
+        -- defaults + operational-state init + the config -> state reference
+        local mirror = model:apply(treemgr)
+        stops[#stops + 1] = function() mirror:stop() end
 
         local function apply(enabled)
-            local ok = run_cmd("systemctl " .. (enabled and "start" or "stop") .. " " .. unit)
+            local what = "systemctl " .. (enabled and "start" or "stop") .. " " .. unit
+            local ok = run_cmd(what)
             treemgr.set(run, ok and enabled or false)
+            treemgr.set(err, ok and "" or (what .. " failed"))
         end
 
         -- honour a persisted knob at boot (autostart across reboots)
         apply(treemgr.get(knob) == true)
 
-        handles[#handles + 1] = treemgr.register(knob, function(lmap)
+        local hook = treemgr.register(knob, function(lmap)
             local enabled = lmap[knob]
             if enabled == nil then enabled = treemgr.get(knob) end
             apply(enabled == true)
         end)
+        stops[#stops + 1] = function() treemgr.unregister(hook) end
     end
 
     local handle = {}
     function handle:stop()
-        for _, h in ipairs(handles) do treemgr.unregister(h) end
+        for _, stop in ipairs(stops) do stop() end
     end
     return handle
 end

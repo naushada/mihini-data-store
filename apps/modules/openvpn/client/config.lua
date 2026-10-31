@@ -2,11 +2,14 @@
 --
 -- Conventions (see apps/modules/supervisor.lua):
 --   config.enabled  boolean start/stop knob, persisted in flash
---   state.running   boolean actual status, written by the supervisor via systemd
+--   state.*         operational state: config leafs are referenced in (mirror = true)
+--                   plus extra operational-only leafs (running / pid / last_error)
+--                   written by the supervisor.
 return {
     namespace = "openvpn.client",
     unit = "openvpn-client.service",
     store = "flash",
+    mirror = true,          -- reference every config leaf into state.*
 
     config = {
         enabled = { type = "boolean", default = false },          -- start/stop knob
@@ -16,7 +19,9 @@ return {
         proto   = { type = "string",  default = "udp", enum = { "udp", "tcp" } },
     },
 
-    state = {
-        running = { type = "boolean", default = false },          -- actual, by supervisor
+    state = {                                                     -- operational (config false)
+        running    = { type = "boolean", default = false },       -- actual, by supervisor
+        pid        = { type = "integer", default = 0 },
+        last_error = { type = "string",  default = "" },
     },
 }

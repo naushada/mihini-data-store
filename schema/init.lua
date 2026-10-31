@@ -22,13 +22,23 @@
 -- A leaf is any model node that carries a `type`; everything else that is a table is
 -- a container. Leaf fields:
 --     type      string   "boolean" | "integer" | "float" | "string" | "list:<type>"
---     default   *        written on first boot when the config leaf is absent
+--     default   *        written on first boot when the leaf is absent
 --     range     {min,max} integer only
 --     pattern   string   Lua pattern, string only
 --     enum      list     allowed values, string only (YANG-like enumeration)
---     writable  bool     ignored for now (config leafs are writable by default)
---     state     bool|str  mirror this leaf into state_root.<relpath> (or an
---                         explicit string path) whenever the config value changes
+--     state     bool|str  (on a config leaf) reference just this leaf into the state
+--                         container, or an explicit string path; see `mirror` below
+--
+-- Model fields (YANG / OpenConfig shape):
+--     config     required  the intended-config tree (config true leafs)
+--     state      optional  the operational-state tree (config false leafs). These
+--                          have no config counterpart and are written by an external
+--                          actor (e.g. a supervisor reporting `running`, `pid`).
+--     mirror     bool      reference EVERY config leaf into the state container
+--                          (state.<namespace>.<rel>), OpenConfig-style. Default false;
+--                          when true you usually don't need per-leaf `state`.
+--     namespace  string    dot-path prefix applied to every config/state leaf path
+--     store      "flash"|"ram"  backing for intended config (default "flash")
 
 local M = {}
 
@@ -160,6 +170,24 @@ function Model:apply_defaults(treemgr)
     return self
 end
 
+-- Write defaults for any operational-state leaf that is absent. Unlike config
+-- leafs, existing state values are NOT validated here -- they are written by
+-- external actors (supervisors, drivers), not by the config model.
+function Model:apply_state_defaults(treemgr)
+    treemgr = treemgr or self:_treemgr()
+    local writes = {}
+    self:each_state_leaf(function(rel, spec)
+        local spath = self:state_path(rel)
+        if treemgr.get(spath) == nil and spec.default ~= nil then
+            local ok, err = validate(spec.default, spec)
+            assert(ok, "invalid default for " .. spath .. ": " .. tostring(err))
+            writes[spath] = spec.default
+        end
+    end)
+    if next(writes) then treemgr.set(writes) end
+    return self
+end
+
 -- Subscribe to every state=true config leaf and mirror its value into the state
 -- container. Performs an initial mirror pass, then keeps the state container in
 -- sync on every change. Returns a handle with :stop().
@@ -168,9 +196,9 @@ function Model:start_mirror(treemgr)
 
     local monitored, statemap = {}, {}
     each_leaf(self.config, nil, function(rel, spec)
-        if spec.state then
+        if self.mirror or spec.state then
             local cpath = self:config_path(rel)
-            local spath = spec.state == true and self:state_path(rel) or spec.state
+            local spath = type(spec.state) == "string" and spec.state or self:state_path(rel)
             statemap[cpath] = spath
             monitored[#monitored + 1] = cpath
         end
@@ -201,10 +229,12 @@ function Model:start_mirror(treemgr)
     return handle
 end
 
--- Convenience: defaults + mirror in one call, returning the mirror handle.
+-- Convenience: config defaults + state defaults + the config->state mirror in one
+-- call, returning the mirror handle.
 function Model:apply(treemgr)
     treemgr = treemgr or self:_treemgr()
     self:apply_defaults(treemgr)
+    self:apply_state_defaults(treemgr)
     return self:start_mirror(treemgr)
 end
 
@@ -225,6 +255,7 @@ function M.load(model)
     o.state = model.state or {}
     o.namespace = model.namespace
     o.unit = model.unit
+    o.mirror = model.mirror
     o.store = model.store or "flash"
     o.config_root = model.config_root or (o.store == "ram" and "ram" or "config")
     o.state_root = model.state_root or "state"
