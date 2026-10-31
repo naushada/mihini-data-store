@@ -10,8 +10,10 @@ cmake_minimum_required(VERSION 3.16)
 #   * dtls_set_log_sink() host hook (dtls_debug.{h,c})
 # See LICENSE for the EPL-1.0 | EDL-1.0 dual license.
 
-# The parent project() enables only CXX; tinydtls is C, so opt the language in.
-enable_language(C)
+# Declare a project so this tree also builds standalone (e.g. as its own Yocto
+# recipe). As a subdirectory this merely scopes PROJECT_* here and enables C;
+# the parent's CXX remains available either way.
+project(tinydtls C)
 
 add_library(tinydtls STATIC
     dtls.c
