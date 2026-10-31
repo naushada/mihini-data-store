@@ -1,0 +1,11 @@
+[Unit]
+Description=LwM2M client (managed by the Mihini module supervisor)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Binary provided by the iot LwM2M stack: Wakaama + Eclipse tinydtls for the
+# CoAPs (DTLS-PSK) transport -- see config.lwm2m.client.security.mode / psk.*.
+ExecStart=/usr/bin/lwm2m-client
+Restart=no

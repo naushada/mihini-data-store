@@ -1,0 +1,13 @@
+[Unit]
+Description=OpenVPN client (managed by the Mihini module supervisor)
+# Started/stopped on demand by the supervisor via `systemctl start/stop`; never
+# enabled at boot -- config.openvpn.client.enabled is the source of truth.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Config path is the default of config.openvpn.client.config. A future generator
+# could render these args from the data-store config instead of a fixed file.
+ExecStart=/usr/sbin/openvpn --config /etc/openvpn/client.ovpn
+Restart=no

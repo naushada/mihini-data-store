@@ -115,13 +115,33 @@ function Model:_treemgr()
     return self._tm
 end
 
+function Model:_prefix()
+    return self.namespace and (self.namespace .. ".") or ""
+end
+
+-- Absolute logical path of a config / state leaf under this model's root.
+function Model:config_path(rel)
+    return self.config_root .. "." .. self:_prefix() .. rel
+end
+
+function Model:state_path(rel)
+    return self.state_root .. "." .. self:_prefix() .. rel
+end
+
+-- visit(relpath, leafspec) for every operational-state leaf. Unlike the
+-- config->state mirror, these are written by an external actor (e.g. a module
+-- supervisor reporting what systemd actually started), not derived from config.
+function Model:each_state_leaf(visit)
+    each_leaf(self.state, nil, visit)
+end
+
 -- Write defaults for any config leaf that is absent, and validate whatever is
 -- already present. Raises on an invalid existing value (fail fast at boot).
 function Model:apply_defaults(treemgr)
     treemgr = treemgr or self:_treemgr()
     local writes = {}
     each_leaf(self.config, nil, function(rel, spec)
-        local cpath = self.config_root .. "." .. rel
+        local cpath = self:config_path(rel)
         local cur = treemgr.get(cpath)
         if cur == nil then
             if spec.default ~= nil then
@@ -149,8 +169,8 @@ function Model:start_mirror(treemgr)
     local monitored, statemap = {}, {}
     each_leaf(self.config, nil, function(rel, spec)
         if spec.state then
-            local cpath = self.config_root .. "." .. rel
-            local spath = spec.state == true and (self.state_root .. "." .. rel) or spec.state
+            local cpath = self:config_path(rel)
+            local spath = spec.state == true and self:state_path(rel) or spec.state
             statemap[cpath] = spath
             monitored[#monitored + 1] = cpath
         end
@@ -190,6 +210,9 @@ end
 
 -- Load and check a model table. Fields:
 --     config       (required) the config tree of containers/leafs
+--     state        optional operational-state tree (written by an external actor)
+--     namespace    optional dot-path prefix applied to every config/state leaf
+--                  path (e.g. "openvpn.client" -> config.openvpn.client.enabled)
 --     store        "flash" (default, persisted config.*) or "ram" (volatile ram.*)
 --     config_root  override the logical root where intended config lives
 --     state_root   override the logical root of the state container (default "state")
@@ -199,6 +222,9 @@ function M.load(model)
 
     local o = setmetatable({}, Model)
     o.config = model.config
+    o.state = model.state or {}
+    o.namespace = model.namespace
+    o.unit = model.unit
     o.store = model.store or "flash"
     o.config_root = model.config_root or (o.store == "ram" and "ram" or "config")
     o.state_root = model.state_root or "state"

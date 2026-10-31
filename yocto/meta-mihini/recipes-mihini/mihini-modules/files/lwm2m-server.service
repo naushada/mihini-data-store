@@ -1,0 +1,11 @@
+[Unit]
+Description=LwM2M server (managed by the Mihini module supervisor)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# DM (coaps://:5683) + bootstrap (coaps://:5684) listeners; DTLS-PSK via
+# Eclipse tinydtls, matching the iot repo's LwM2M server.
+ExecStart=/usr/bin/lwm2m-server
+Restart=no

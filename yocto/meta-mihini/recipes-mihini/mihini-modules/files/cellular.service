@@ -1,0 +1,8 @@
+[Unit]
+Description=Cellular modem (managed by the Mihini module supervisor)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/ModemManager
+Restart=no

@@ -10,6 +10,7 @@ artifacts back to a host directory.
 |---|---|
 | `mihini-schema` recipe | Written; installs `schema/*.lua` + `state.map`. Correct-by-construction (simple file copy), **not yet run through bitbake**. |
 | `mihini-datastore` recipe | Written; cross-compiles the C++ lib + CLI via `cmake`. Correct-by-construction, **not yet run through bitbake**. |
+| `mihini-modules` recipe | Written; installs `apps/modules/*` Lua configs + supervisor + 5 on-demand systemd units. Correct-by-construction, **not yet run through bitbake**. |
 | `mihini-agent` recipe | **Skeleton only.** The vendored 2012-era C/Lua must be ported to the Scarthgap (gcc 12/13) toolchain before the agent builds. This is the main remaining work. |
 | Container + `build.sh` | Written; clones poky/meta-openembedded/meta-raspberrypi (Scarthgap), builds in `crops/poky`, copies artifacts to the host. Untested end-to-end. |
 
@@ -31,6 +32,7 @@ yocto/
     └── recipes-mihini/
         ├── mihini-schema/      # schema/*.lua + state.map -> ${datadir}/mihini
         ├── mihini-datastore/   # libmihini-datastore.a + datastore-cli
+        ├── mihini-modules/     # apps/modules/* + supervisor + systemd units
         └── mihini-agent/       # SKELETON (port pending)
     └── recipes-core/images/core-image-base.bbappend
 ```
@@ -70,6 +72,10 @@ bmaptool copy \
   installed under `${datadir}/mihini`.
 - `mihini-datastore` — `libmihini-datastore.a` (headers + static lib) and the
   `datastore-cli` binary.
+- `mihini-modules` — the per-module Lua configs under `apps/modules/`
+  (openvpn client/server, lwm2m client/server, cellular), the `supervisor.lua`
+  that maps each module's `enabled` knob to `systemctl start/stop`, and the five
+  on-demand `.service` units (installed, not boot-enabled).
 
 The `mihini-agent` package is commented out in the image bbappend until its recipe
 is ported.
