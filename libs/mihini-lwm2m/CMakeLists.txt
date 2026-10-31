@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Declare a project so this tree also builds standalone (as its own Yocto
+# recipe); as a subdirectory it merely scopes PROJECT_* here and re-declares
+# CXX (already enabled by the parent).
+project(mihini-lwm2m CXX)
+
 # Self-contained C++17 LwM2M 1.1 library: CoAP (RFC 7252), TLV (Core Annex C),
 # SenML JSON (RFC 8428), the object/resource model, the Read/Write/Execute +
 # Observe-Notify/Send ("push") dispatcher, and a DTLS 1.2 (PSK) transport over
@@ -9,7 +14,22 @@ cmake_minimum_required(VERSION 3.16)
 #   add_subdirectory(libs/mihini-lwm2m)
 #   target_link_libraries(your_app PRIVATE mihini-lwm2m)
 
-add_subdirectory(3rdparty/tinydtls)
+# tinydtls is vendored under 3rdparty/ and built as a subdirectory by default
+# (the self-contained path). On-target Yocto builds link the system tinydtls
+# from the tinydtls recipe instead, so libtinydtls.a is owned once, by that
+# recipe, and the archive is not duplicated across packages.
+option(MIHINI_LWM2M_SYSTEM_TINYDTLS
+       "Link a system-installed tinydtls instead of the vendored subdirectory" OFF)
+if(MIHINI_LWM2M_SYSTEM_TINYDTLS)
+    find_path(TINYDTLS_INCLUDE_DIR NAMES tinydtls.h PATH_SUFFIXES tinydtls REQUIRED)
+    find_library(TINYDTLS_LIBRARY NAMES tinydtls REQUIRED)
+    add_library(tinydtls STATIC IMPORTED)
+    set_target_properties(tinydtls PROPERTIES
+        IMPORTED_LOCATION "${TINYDTLS_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${TINYDTLS_INCLUDE_DIR}")
+else()
+    add_subdirectory(3rdparty/tinydtls)
+endif()
 
 add_library(mihini-lwm2m STATIC
     src/coap.cpp
