@@ -1,8 +1,8 @@
-#include "mihini/lwm2m/tlv.hpp"
+#include "lwm2m/tlv.hpp"
 
 #include <cstdint>
 
-namespace mihini::lwm2m::tlv {
+namespace lwm2m::tlv {
 
 std::string encode(std::uint8_t type, std::uint16_t id, const std::string& value) {
     std::string out;
@@ -118,4 +118,4 @@ std::vector<Record> resources(const std::vector<Record>& wire) {
     return out;
 }
 
-} // namespace mihini::lwm2m::tlv
+} // namespace lwm2m::tlv

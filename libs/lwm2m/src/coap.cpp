@@ -1,8 +1,8 @@
-#include "mihini/lwm2m/coap.hpp"
+#include "lwm2m/coap.hpp"
 
 #include <cstdint>
 
-namespace mihini::lwm2m::coap {
+namespace lwm2m::coap {
 
 namespace {
 
@@ -157,4 +157,4 @@ bool decode(const std::string& bytes, Message& m) {
     return true;
 }
 
-} // namespace mihini::lwm2m::coap
+} // namespace lwm2m::coap

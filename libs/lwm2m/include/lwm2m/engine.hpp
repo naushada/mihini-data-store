@@ -12,7 +12,7 @@
 // Send). Pure logic over the ObjectStore -- no sockets. Reference shape from the
 // iot repo's lwm2m_dm_client.hpp + lwm2m_observe.hpp.
 
-namespace mihini::lwm2m {
+namespace lwm2m {
 
 class Engine {
 public:
@@ -55,4 +55,4 @@ private:
                                          const std::vector<std::int32_t>& seg);
 };
 
-} // namespace mihini::lwm2m
+} // namespace lwm2m

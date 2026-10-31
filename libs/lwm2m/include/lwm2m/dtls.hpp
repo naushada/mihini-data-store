@@ -9,17 +9,22 @@
 // DTLS 1.2 transport over tinydtls — the CoAPs wire under LwM2M. Adapted from
 // the iot repo's DTLSAdapter (apps/src/dtls_adapter.cpp) with the ACE logging
 // and data-store coupling removed: PSK lookup is a std::function and decrypted
-// CoAP is handed to an InboundHandler the caller wires to mihini::lwm2m::Engine.
+// CoAP is handed to an InboundHandler the caller wires to lwm2m::Engine.
 //
-// The adapter owns the UDP socket and the tinydtls context but performs no I/O
-// loop of its own; the host drives rx() (datagrams in) and check_retransmit()
-// (handshake retransmission timer) exactly like the iot repo's reactor tick.
+// The adapter owns the UDP socket, the tinydtls context, and a libevent
+// event_base. open() registers the socket for reads (EV_READ) and a periodic
+// handshake-retransmit timer on that base, so the host drives the transport by
+// dispatching the base (event_base_loop / event_base_dispatch). rx() and
+// check_retransmit() stay public so a caller can also step the transport by
+// hand.
 //
 // tinydtls is vendored under 3rdparty/ and kept entirely out of this header:
 // DtlsImpl is an opaque handle defined in src/dtls.cpp, so codec-only consumers
-// of mihini-lwm2m never see the C headers.
+// of lwm2m never see the C headers.
 
-namespace mihini::lwm2m {
+struct event_base; // libevent (see <event2/event.h>); opaque here
+
+namespace lwm2m {
 
 struct DtlsImpl; // opaque; defined in src/dtls.cpp
 
@@ -48,6 +53,9 @@ public:
     void close();
 
     int fd() const;
+
+    // The libevent loop driving the socket reads and the retransmit timer.
+    event_base* base() const;
 
     // Client role: pin the peer and start a DTLS handshake (dtls_connect). The
     // initial ClientHello is emitted through the write callback.
@@ -84,4 +92,4 @@ private:
     std::unique_ptr<DtlsImpl> impl_;
 };
 
-} // namespace mihini::lwm2m
+} // namespace lwm2m

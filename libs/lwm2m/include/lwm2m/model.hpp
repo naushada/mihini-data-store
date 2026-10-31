@@ -11,7 +11,7 @@
 // so concrete bindings (device info, app data) can be injected without touching
 // the codec or dispatch layers.
 
-namespace mihini::lwm2m {
+namespace lwm2m {
 
 // OMA LwM2M Core 1.1 §C data types.
 enum class ResourceType : std::uint8_t {
@@ -93,4 +93,4 @@ private:
     std::map<std::uint32_t, ObjectDescriptor> objects_;
 };
 
-} // namespace mihini::lwm2m
+} // namespace lwm2m

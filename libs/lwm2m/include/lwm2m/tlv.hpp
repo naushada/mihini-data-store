@@ -8,7 +8,7 @@
 // lwm2m_codec_tlv.hpp. Handles the record framing: type field (bits 7-6),
 // identifier length (bit 5), length-field size (bits 4-3), id, length, value.
 
-namespace mihini::lwm2m::tlv {
+namespace lwm2m::tlv {
 
 // Type field (bits 7-6 of the first byte).
 enum : std::uint8_t {
@@ -43,4 +43,4 @@ bool decode(const std::string& bytes, std::vector<Record>& out);
 // instance (0) and multiple-resource (2) containers. Each leaf's `id` is its rid.
 std::vector<Record> resources(const std::vector<Record>& wire);
 
-} // namespace mihini::lwm2m::tlv
+} // namespace lwm2m::tlv

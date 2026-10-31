@@ -1,12 +1,12 @@
-#include "mihini/lwm2m/engine.hpp"
+#include "lwm2m/engine.hpp"
 
-#include "mihini/lwm2m/tlv.hpp"
+#include "lwm2m/tlv.hpp"
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace mihini::lwm2m {
+namespace lwm2m {
 
 namespace {
 
@@ -327,4 +327,4 @@ std::string Engine::build_send(std::uint16_t msgid, const std::string& token,
     return coap::encode(msg);
 }
 
-} // namespace mihini::lwm2m
+} // namespace lwm2m

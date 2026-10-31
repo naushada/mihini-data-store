@@ -4,13 +4,13 @@
 #include <utility>
 #include <vector>
 
-#include "mihini/lwm2m/coap.hpp"
-#include "mihini/lwm2m/tlv.hpp"
-#include "mihini/lwm2m/senml.hpp"
-#include "mihini/lwm2m/model.hpp"
-#include "mihini/lwm2m/engine.hpp"
+#include "lwm2m/coap.hpp"
+#include "lwm2m/tlv.hpp"
+#include "lwm2m/senml.hpp"
+#include "lwm2m/model.hpp"
+#include "lwm2m/engine.hpp"
 
-using namespace mihini::lwm2m;
+using namespace lwm2m;
 
 static int failures = 0;
 

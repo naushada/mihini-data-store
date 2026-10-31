@@ -8,7 +8,7 @@
 // Self-contained, no external dependencies. Reference implementation shape from
 // the iot repo's coap_adapter.hpp, reduced to what read/write/push needs.
 
-namespace mihini::lwm2m::coap {
+namespace lwm2m::coap {
 
 enum class Type : std::uint8_t {
     Con = 0,   // confirmable
@@ -87,4 +87,4 @@ bool decode(const std::string& bytes, Message& m);
 inline std::uint16_t code_class(Code c) { return static_cast<std::uint8_t>(c) >> 5; }
 inline std::uint16_t code_detail(Code c) { return static_cast<std::uint8_t>(c) & 0x1f; }
 
-} // namespace mihini::lwm2m::coap
+} // namespace lwm2m::coap

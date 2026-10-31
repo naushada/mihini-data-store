@@ -1,6 +1,6 @@
-#include "mihini/lwm2m/model.hpp"
+#include "lwm2m/model.hpp"
 
-namespace mihini::lwm2m {
+namespace lwm2m {
 
 void ObjectStore::add_object(ObjectDescriptor descriptor) {
     objects_[descriptor.oid] = std::move(descriptor);
@@ -58,4 +58,4 @@ const Resource* ObjectStore::find(std::uint32_t oid, std::uint32_t iid, std::uin
     return it == inst->resources.end() ? nullptr : &it->second;
 }
 
-} // namespace mihini::lwm2m
+} // namespace lwm2m

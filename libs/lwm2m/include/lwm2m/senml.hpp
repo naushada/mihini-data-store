@@ -8,7 +8,7 @@
 // payloads and the Send ("push") operation. Reference shape from the iot repo's
 // lwm2m_codec_senml.hpp. Covers the LwM2M-relevant subset: bn, n, v, vs, vb, vd.
 
-namespace mihini::lwm2m::senml {
+namespace lwm2m::senml {
 
 enum class Kind : std::uint8_t {
     None,
@@ -40,4 +40,4 @@ std::string encode_json(const std::vector<Record>& records);
 // Decode SenML JSON. Returns false on malformed input.
 bool decode_json(const std::string& bytes, std::vector<Record>& out);
 
-} // namespace mihini::lwm2m::senml
+} // namespace lwm2m::senml

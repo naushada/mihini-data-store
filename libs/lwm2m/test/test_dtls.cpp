@@ -1,19 +1,21 @@
 #include <cstdint>
 #include <cstdio>
+#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <netinet/in.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 
-#include "mihini/lwm2m/coap.hpp"
-#include "mihini/lwm2m/dtls.hpp"
-#include "mihini/lwm2m/engine.hpp"
-#include "mihini/lwm2m/model.hpp"
+#include <event2/event.h>
 
-using namespace mihini::lwm2m;
+#include "lwm2m/coap.hpp"
+#include "lwm2m/dtls.hpp"
+#include "lwm2m/engine.hpp"
+#include "lwm2m/model.hpp"
+
+using namespace lwm2m;
 
 static int failures = 0;
 
@@ -100,28 +102,17 @@ int main() {
 
     CHECK(client.connect("127.0.0.1", sport));
 
+    // Drive both transports through their libevent bases until the handshake
+    // completes and the client receives the response, or the deadline passes.
     bool sent = false;
     bool ok = false;
-    for (int i = 0; i < 2000 && !ok; ++i) {
-        client.check_retransmit();
-        server.check_retransmit();
-
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        FD_SET(client.fd(), &rfds);
-        FD_SET(server.fd(), &rfds);
-        const int nfds = (client.fd() > server.fd() ? client.fd() : server.fd()) + 1;
-        struct timeval tv{0, 10000}; // 10 ms
-        const int n = ::select(nfds, &rfds, nullptr, nullptr, &tv);
-        if (n < 0) break;
-        if (n > 0) {
-            if (FD_ISSET(client.fd(), &rfds)) client.rx();
-            if (FD_ISSET(server.fd(), &rfds)) server.rx();
-        }
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!ok && std::chrono::steady_clock::now() < deadline) {
+        event_base_loop(client.base(), EVLOOP_ONCE);
+        event_base_loop(server.base(), EVLOOP_ONCE);
 
         if (client.connected() && !sent) {
-            const std::string wire = coap::encode(make_get());
-            client.tx_peer(wire);
+            client.tx_peer(coap::encode(make_get()));
             sent = true;
         }
         if (!client_payload.empty()) ok = true;

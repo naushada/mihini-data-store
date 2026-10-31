@@ -1,4 +1,4 @@
-#include "mihini/lwm2m/senml.hpp"
+#include "lwm2m/senml.hpp"
 
 #include <cstdint>
 #include <cmath>
@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 
-namespace mihini::lwm2m::senml {
+namespace lwm2m::senml {
 
 namespace {
 
@@ -383,4 +383,4 @@ bool decode_json(const std::string& bytes, std::vector<Record>& out) {
     return true;
 }
 
-} // namespace mihini::lwm2m::senml
+} // namespace lwm2m::senml
