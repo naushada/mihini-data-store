@@ -1,8 +1,9 @@
 #include <cstdint>
-#include <cstdio>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "lwm2m/coap.hpp"
 #include "lwm2m/tlv.hpp"
@@ -11,16 +12,6 @@
 #include "lwm2m/engine.hpp"
 
 using namespace lwm2m;
-
-static int failures = 0;
-
-#define CHECK(cond)                                                        \
-    do {                                                                   \
-        if (!(cond)) {                                                     \
-            std::printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond);    \
-            ++failures;                                                    \
-        }                                                                  \
-    } while (0)
 
 // Build a CoAP request whose Uri-Path options spell out `path` (e.g. "/3/0/13").
 static coap::Message get(const std::string& path) {
@@ -39,7 +30,7 @@ static coap::Message get(const std::string& path) {
     return m;
 }
 
-static void test_coap_roundtrip() {
+TEST(Coap, Roundtrip) {
     coap::Message m;
     m.type = coap::Type::Con;
     m.code = coap::Code::Get;
@@ -52,46 +43,48 @@ static void test_coap_roundtrip() {
     m.payload = "hello";
 
     const std::string wire = coap::encode(m);
-    CHECK(!wire.empty());
+    EXPECT_FALSE(wire.empty());
 
     coap::Message d;
-    CHECK(coap::decode(wire, d));
-    CHECK(d.type == coap::Type::Con);
-    CHECK(d.code == coap::Code::Get);
-    CHECK(d.id == 0x0BAD);
-    CHECK(d.token == m.token);
-    CHECK(d.uri_path() == "/3/0/13");
-    CHECK(d.payload == "hello");
-    CHECK(d.find_option(coap::OPT_ACCEPT) != nullptr);
-    CHECK(*d.find_option(coap::OPT_ACCEPT) == std::string(1, '\x00'));
+    EXPECT_TRUE(coap::decode(wire, d));
+    EXPECT_EQ(d.type, coap::Type::Con);
+    EXPECT_EQ(d.code, coap::Code::Get);
+    EXPECT_EQ(d.id, 0x0BAD);
+    EXPECT_EQ(d.token, m.token);
+    EXPECT_EQ(d.uri_path(), "/3/0/13");
+    EXPECT_EQ(d.payload, "hello");
+    ASSERT_NE(d.find_option(coap::OPT_ACCEPT), nullptr);
+    EXPECT_EQ(*d.find_option(coap::OPT_ACCEPT), std::string(1, '\x00'));
 
     // Code class/detail helpers.
-    CHECK(coap::code_class(coap::Code::Content) == 2);
-    CHECK(coap::code_detail(coap::Code::Content) == 5);
+    EXPECT_EQ(coap::code_class(coap::Code::Content), 2);
+    EXPECT_EQ(coap::code_detail(coap::Code::Content), 5);
 }
 
-static void test_tlv_roundtrip() {
+TEST(Tlv, Roundtrip) {
     std::vector<tlv::Record> recs;
     recs.push_back({tlv::TYPE_RESOURCE, 0, "Acme"});
     recs.push_back({tlv::TYPE_RESOURCE, 13, "42"});
 
     const std::string wire = tlv::encode_instance(0, recs);
     std::vector<tlv::Record> decoded;
-    CHECK(tlv::decode(wire, decoded));
+    EXPECT_TRUE(tlv::decode(wire, decoded));
     const auto leafs = tlv::resources(decoded);
-    CHECK(leafs.size() == 2);
-    CHECK(leafs[0].id == 0 && leafs[0].value == "Acme");
-    CHECK(leafs[1].id == 13 && leafs[1].value == "42");
+    ASSERT_EQ(leafs.size(), 2u);
+    EXPECT_TRUE(leafs[0].id == 0 && leafs[0].value == "Acme");
+    EXPECT_TRUE(leafs[1].id == 13 && leafs[1].value == "42");
 
     // Single-resource record.
     const std::string single = tlv::encode_resource(13, "hi");
     std::vector<tlv::Record> sr;
-    CHECK(tlv::decode(single, sr));
-    CHECK(sr.size() == 1 && sr[0].type == tlv::TYPE_RESOURCE);
-    CHECK(sr[0].id == 13 && sr[0].value == "hi");
+    EXPECT_TRUE(tlv::decode(single, sr));
+    ASSERT_EQ(sr.size(), 1u);
+    EXPECT_EQ(sr[0].type, tlv::TYPE_RESOURCE);
+    EXPECT_EQ(sr[0].id, 13);
+    EXPECT_EQ(sr[0].value, "hi");
 }
 
-static void test_senml_roundtrip() {
+TEST(Senml, Roundtrip) {
     std::vector<senml::Record> recs;
 
     senml::Record r;
@@ -110,23 +103,23 @@ static void test_senml_roundtrip() {
     recs.push_back(r2);
 
     const std::string json = senml::encode_json(recs);
-    CHECK(!json.empty());
+    EXPECT_FALSE(json.empty());
 
     std::vector<senml::Record> back;
-    CHECK(senml::decode_json(json, back));
-    CHECK(back.size() == 2);
-    CHECK(back[0].path() == "/3/0/13");
-    CHECK(back[0].kind == senml::Kind::Numeric);
-    CHECK(back[0].numericValue == 42);
-    CHECK(back[1].kind == senml::Kind::String);
-    CHECK(back[1].stringValue == "open");
+    EXPECT_TRUE(senml::decode_json(json, back));
+    ASSERT_EQ(back.size(), 2u);
+    EXPECT_EQ(back[0].path(), "/3/0/13");
+    EXPECT_EQ(back[0].kind, senml::Kind::Numeric);
+    EXPECT_EQ(back[0].numericValue, 42);
+    EXPECT_EQ(back[1].kind, senml::Kind::String);
+    EXPECT_EQ(back[1].stringValue, "open");
 
     // Mismatched base names must be rejected.
     recs[1].baseName = "/4/0/";
-    CHECK(senml::encode_json(recs).empty());
+    EXPECT_TRUE(senml::encode_json(recs).empty());
 }
 
-static void test_engine_read() {
+TEST(Engine, Read) {
     Engine e;
 
     ObjectDescriptor od;
@@ -154,34 +147,34 @@ static void test_engine_read() {
 
     // Resource read -> plain text.
     auto resp = e.handle(get("/3/0/13"));
-    CHECK(resp.size() == 1);
+    ASSERT_EQ(resp.size(), 1u);
     coap::Message d;
-    CHECK(coap::decode(resp[0], d));
-    CHECK(d.code == coap::Code::Content);
-    CHECK(d.payload == "42");
+    EXPECT_TRUE(coap::decode(resp[0], d));
+    EXPECT_EQ(d.code, coap::Code::Content);
+    EXPECT_EQ(d.payload, "42");
 
     // Object read -> TLV.
     auto resp2 = e.handle(get("/3"));
-    CHECK(resp2.size() == 1);
+    ASSERT_EQ(resp2.size(), 1u);
     coap::Message d2;
-    CHECK(coap::decode(resp2[0], d2));
-    CHECK(d2.code == coap::Code::Content);
-    CHECK(d2.find_option(coap::OPT_CONTENT_FORMAT) != nullptr);
+    EXPECT_TRUE(coap::decode(resp2[0], d2));
+    EXPECT_EQ(d2.code, coap::Code::Content);
+    EXPECT_NE(d2.find_option(coap::OPT_CONTENT_FORMAT), nullptr);
 
     // Missing resource -> 4.04.
     auto resp3 = e.handle(get("/3/0/99"));
     coap::Message d3;
-    CHECK(coap::decode(resp3[0], d3));
-    CHECK(d3.code == coap::Code::NotFound);
+    EXPECT_TRUE(coap::decode(resp3[0], d3));
+    EXPECT_EQ(d3.code, coap::Code::NotFound);
 
     // Unknown object -> 4.04.
     auto resp4 = e.handle(get("/99"));
     coap::Message d4;
-    CHECK(coap::decode(resp4[0], d4));
-    CHECK(d4.code == coap::Code::NotFound);
+    EXPECT_TRUE(coap::decode(resp4[0], d4));
+    EXPECT_EQ(d4.code, coap::Code::NotFound);
 }
 
-static void test_engine_write_notify() {
+TEST(Engine, WriteNotify) {
     Engine e;
 
     std::string value = "off";
@@ -209,12 +202,12 @@ static void test_engine_write_notify() {
     reg.token = "tok1";
     reg.options.insert(reg.options.begin(), {coap::OPT_OBSERVE, std::string(1, '\0')});
     auto resp = e.handle(reg);
-    CHECK(resp.size() == 1);
+    ASSERT_EQ(resp.size(), 1u);
     coap::Message d;
-    CHECK(coap::decode(resp[0], d));
-    CHECK(d.code == coap::Code::Content);
-    CHECK(d.find_option(coap::OPT_OBSERVE) != nullptr);
-    CHECK(d.payload == "off");
+    EXPECT_TRUE(coap::decode(resp[0], d));
+    EXPECT_EQ(d.code, coap::Code::Content);
+    EXPECT_NE(d.find_option(coap::OPT_OBSERVE), nullptr);
+    EXPECT_EQ(d.payload, "off");
 
     // Write -> 2.04 Changed plus a Notify frame to the observer.
     coap::Message w;
@@ -228,22 +221,22 @@ static void test_engine_write_notify() {
     w.payload = "on";
 
     auto resp2 = e.handle(w);
-    CHECK(resp2.size() >= 2);
+    ASSERT_GE(resp2.size(), 2u);
 
     coap::Message d2;
-    CHECK(coap::decode(resp2[0], d2));
-    CHECK(d2.code == coap::Code::Changed);
-    CHECK(value == "on");
+    EXPECT_TRUE(coap::decode(resp2[0], d2));
+    EXPECT_EQ(d2.code, coap::Code::Changed);
+    EXPECT_EQ(value, "on");
 
     coap::Message n;
-    CHECK(coap::decode(resp2[1], n));
-    CHECK(n.code == coap::Code::Content);
-    CHECK(n.token == "tok1");
-    CHECK(n.payload == "on");
-    CHECK(n.find_option(coap::OPT_OBSERVE) != nullptr);
+    EXPECT_TRUE(coap::decode(resp2[1], n));
+    EXPECT_EQ(n.code, coap::Code::Content);
+    EXPECT_EQ(n.token, "tok1");
+    EXPECT_EQ(n.payload, "on");
+    EXPECT_NE(n.find_option(coap::OPT_OBSERVE), nullptr);
 }
 
-static void test_engine_execute() {
+TEST(Engine, Execute) {
     Engine e;
     int calls = 0;
 
@@ -273,13 +266,14 @@ static void test_engine_execute() {
     req.options.push_back({coap::OPT_URI_PATH, "4"});
 
     auto resp = e.handle(req);
+    ASSERT_FALSE(resp.empty());
     coap::Message d;
-    CHECK(coap::decode(resp[0], d));
-    CHECK(d.code == coap::Code::Changed);
-    CHECK(calls == 1);
+    EXPECT_TRUE(coap::decode(resp[0], d));
+    EXPECT_EQ(d.code, coap::Code::Changed);
+    EXPECT_EQ(calls, 1);
 }
 
-static void test_send() {
+TEST(Engine, Send) {
     std::vector<senml::Record> recs;
     senml::Record r;
     r.baseName = "/3/0/";
@@ -291,30 +285,14 @@ static void test_send() {
 
     const std::string wire = Engine::build_send(0x0102, "t", recs);
     coap::Message d;
-    CHECK(coap::decode(wire, d));
-    CHECK(d.code == coap::Code::Post);
-    CHECK(d.uri_path() == "/dp");
-    CHECK(d.find_option(coap::OPT_CONTENT_FORMAT) != nullptr);
+    EXPECT_TRUE(coap::decode(wire, d));
+    EXPECT_EQ(d.code, coap::Code::Post);
+    EXPECT_EQ(d.uri_path(), "/dp");
+    EXPECT_NE(d.find_option(coap::OPT_CONTENT_FORMAT), nullptr);
 
     std::vector<senml::Record> back;
-    CHECK(senml::decode_json(d.payload, back));
-    CHECK(back.size() == 1 && back[0].path() == "/3/0/13");
-    CHECK(back[0].numericValue == 7);
-}
-
-int main() {
-    test_coap_roundtrip();
-    test_tlv_roundtrip();
-    test_senml_roundtrip();
-    test_engine_read();
-    test_engine_write_notify();
-    test_engine_execute();
-    test_send();
-
-    if (failures) {
-        std::printf("%d failure(s)\n", failures);
-        return 1;
-    }
-    std::printf("all tests passed\n");
-    return 0;
+    EXPECT_TRUE(senml::decode_json(d.payload, back));
+    ASSERT_EQ(back.size(), 1u);
+    EXPECT_EQ(back[0].path(), "/3/0/13");
+    EXPECT_EQ(back[0].numericValue, 7);
 }

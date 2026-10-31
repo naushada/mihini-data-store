@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdio>
 #include <chrono>
 #include <string>
 #include <utility>
@@ -10,22 +9,14 @@
 
 #include <event2/event.h>
 
+#include <gtest/gtest.h>
+
 #include "lwm2m/coap.hpp"
 #include "lwm2m/dtls.hpp"
 #include "lwm2m/engine.hpp"
 #include "lwm2m/model.hpp"
 
 using namespace lwm2m;
-
-static int failures = 0;
-
-#define CHECK(cond)                                                        \
-    do {                                                                   \
-        if (!(cond)) {                                                     \
-            std::printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond);    \
-            ++failures;                                                    \
-        }                                                                  \
-    } while (0)
 
 // TLS_PSK_WITH_AES_128_CCM_8 uses a 16-byte key; stored as hex like the iot repo.
 static const std::string PSK_ID = "iot-client";
@@ -68,16 +59,16 @@ static std::uint16_t bound_port(int fd) {
     return ntohs(sin.sin_port);
 }
 
-int main() {
+TEST(Dtls, PskHandshakeRoundtrip) {
     Engine engine = make_engine();
 
     DtlsAdapter server;
     DtlsAdapter client;
 
-    CHECK(server.open(0));
-    CHECK(client.open(0));
+    ASSERT_TRUE(server.open(0));
+    ASSERT_TRUE(client.open(0));
     const std::uint16_t sport = bound_port(server.fd());
-    CHECK(sport != 0);
+    ASSERT_NE(sport, 0);
 
     // Shared PSK. The server resolves the key by the identity the client
     // presents (credentials map); the client pins its identity before connect.
@@ -100,7 +91,7 @@ int main() {
         return std::vector<std::string>{};
     });
 
-    CHECK(client.connect("127.0.0.1", sport));
+    ASSERT_TRUE(client.connect("127.0.0.1", sport));
 
     // Drive both transports through their libevent bases until the handshake
     // completes and the client receives the response, or the deadline passes.
@@ -118,13 +109,6 @@ int main() {
         if (!client_payload.empty()) ok = true;
     }
 
-    CHECK(client.connected());
-    CHECK(client_payload == "42");
-
-    if (failures) {
-        std::printf("%d failure(s)\n", failures);
-        return 1;
-    }
-    std::printf("all dtls tests passed\n");
-    return 0;
+    EXPECT_TRUE(client.connected());
+    EXPECT_EQ(client_payload, "42");
 }

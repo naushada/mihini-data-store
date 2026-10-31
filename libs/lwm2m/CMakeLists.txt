@@ -71,14 +71,28 @@ target_compile_features(lwm2m PUBLIC cxx_std_17)
 target_link_libraries(lwm2m PRIVATE tinydtls ${LIBEVENT_LIBRARY})
 
 # Unit tests. Enabled through the top-level project's CTest, or run directly.
+# GoogleTest is fetched at configure time (pinned release) so the tests build
+# identically on a host and inside a container, with no system gtest package.
 include(CTest)
 if(BUILD_TESTING)
+    include(FetchContent)
+    set(INSTALL_GTEST OFF)   # subproject: don't install gtest artifacts
+    set(BUILD_GMOCK OFF)     # only gtest is needed here
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.15.2
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(googletest)
+    include(GoogleTest)
+
     add_executable(test_lwm2m test/test_lwm2m.cpp)
-    target_link_libraries(test_lwm2m PRIVATE lwm2m)
-    add_test(NAME lwm2m COMMAND test_lwm2m)
+    target_link_libraries(test_lwm2m PRIVATE lwm2m gtest_main)
+    gtest_discover_tests(test_lwm2m)
 
     add_executable(test_dtls test/test_dtls.cpp)
-    target_link_libraries(test_dtls PRIVATE lwm2m)
+    target_link_libraries(test_dtls PRIVATE lwm2m gtest_main)
     target_include_directories(test_dtls PRIVATE ${LIBEVENT_INCLUDE_DIR})
-    add_test(NAME dtls COMMAND test_dtls)
+    gtest_discover_tests(test_dtls)
 endif()
