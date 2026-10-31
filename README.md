@@ -389,7 +389,94 @@ asset:pushData("temperature", { value = 23.5, unit = "C" }, "now")
 airvantage.triggerPolicy("now")   -- flush the 'now' policy immediately
 ```
 
-## 10. Source map
+## 10. C++ library (`libs/mihini-datastore`)
+
+This repository also ships a **static C++ library** that bridges the device tree
+to C++ applications. It mirrors the four operations of the underlying EMP /
+`treemgr` API — **get**, **set**, **register** and **notify** — but through a
+modern, type-safe facade.
+
+### Value type — `std::variant`
+
+A device-tree value is represented as a `std::variant` whose alternatives line
+up, in index order, with the SWI `swi_dset_Type_t` codes:
+
+```cpp
+#include "mihini/value.hpp"
+
+namespace mihini {
+using Value = std::variant<std::monostate,   // Nil
+                           std::int64_t,     // Integer
+                           double,           // Float
+                           std::string,      // String
+                           bool>;            // Bool
+
+enum class ValueType { Nil, Integer, Float, String, Bool };
+}
+```
+
+`std::visit`, `std::get_if`, and `std::holds_alternative` all work directly on a
+returned `Value`.
+
+### `DataStore` facade — get / set / register / notify
+
+```cpp
+#include "mihini/datastore.hpp"
+
+auto backend = mihini::make_inmemory_backend();   // offline default
+mihini::DataStore store(*backend);
+store.connect();
+
+store.set("system.sw_info.fw_ver", mihini::Value{std::string("4.2.5")});
+mihini::Value v = store.get("system.sw_info.fw_ver");
+
+auto children = store.getChildren("system.gprs");
+auto batch    = store.get({"system.gprs.ip", "system.sw_info.fw_ver"});
+
+// register + notify: subscribe to changes, the callback receives a ChangeMap
+// of the changed variables plus any passive variables.
+auto sub = store.subscribe(
+    {"system.gprs"},
+    [](const mihini::ChangeMap& changes) { /* notify handler */ },
+    {"system.sw_info.fw_ver"});
+
+sub.reset();   // unregister
+store.disconnect();
+```
+
+The public `DataStore` methods are `get`, `getChildren`, `set`, `registerNotify`
+(subscribe), and `unregister`; `subscribe` is the RAII convenience that returns a
+move-only `Subscription`. The notify callback is a
+`std::function<void(const ChangeMap&)>`.
+
+### Transport seam
+
+`DataStore` talks to a pluggable `Backend` (`include/mihini/backend.hpp`):
+
+- **`InMemoryBackend`** — a flat `std::map`, dot-separated paths, full
+  get/set/register/notify semantics. Lets an app run offline with no agent.
+- **`EmpBackend`** — wraps the vendored `swi_devicetree` / `swi_dset` C client,
+  which sends `GetVariable` / `SetVariable` / `RegisterVariable` /
+  `NotifyVariable` / `UnregisterVariable` to the agent. Compiled only with
+  `-DMIHINI_DATSTORE_WITH_SWILIBS=ON`.
+
+```cpp
+auto backend = mihini::make_emp_backend();   // real device tree over EMP
+```
+
+### Build & run
+
+```sh
+cmake -B build
+cmake --build build
+./build/apps/datastore-cli/datastore-cli
+```
+
+The `apps/datastore-cli` demo exercises all four operations end-to-end.
+
+---
+
+## 11. Source map
 
 ```
 agent/agent/
@@ -405,11 +492,15 @@ agent/agent/
 
 libs/keystore/            # C key-value store (separate, lower-level)
 luafwk/log/log_store.*    # C log storage
+
+# --- this repository (C++ interface) ---
+libs/mihini-datastore/    # static C++ library (Value + DataStore + backends)
+apps/datastore-cli/       # example app exercising get/set/register/notify
 ```
 
 ---
 
-## 11. License & provenance
+## 12. License & provenance
 
 - **License:** Eclipse Public License v1.0 (`http://www.eclipse.org/legal/epl-v10.html`).
 - **Copyright:** © 2012 Sierra Wireless and others.

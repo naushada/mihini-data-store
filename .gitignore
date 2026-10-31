@@ -1,0 +1,12 @@
+# CMake build tree
+build/
+build-*/
+
+# Compiled artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Editor / OS noise
+.DS_Store
