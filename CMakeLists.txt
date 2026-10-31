@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.16)
 
 project(mihini-data-store LANGUAGES CXX)
 
+enable_testing()
+
 # Build everything:
 #
 #   cmake -B build
@@ -11,4 +13,5 @@ project(mihini-data-store LANGUAGES CXX)
 # See libs/mihini-datastore/CMakeLists.txt for enabling the EMP backend.
 
 add_subdirectory(libs/mihini-datastore)
+add_subdirectory(libs/mihini-lwm2m)
 add_subdirectory(apps/datastore-cli)
