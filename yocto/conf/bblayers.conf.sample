@@ -1,0 +1,17 @@
+# bblayers.conf -- layer list for the Mihini data-store image.
+#
+# Paths assume the container layout used by build.sh:
+#     /workdir = workspace (poky, meta-openembedded, meta-raspberrypi)
+#     /repo    = this repository (yocto/meta-mihini lives here)
+# Replace the absolute paths if you run bitbake natively.
+
+BBLAYERS ?= " \
+  /workdir/poky/meta \
+  /workdir/poky/meta-poky \
+  /workdir/poky/meta-yocto-bsp \
+  /workdir/meta-openembedded/meta-oe \
+  /workdir/meta-openembedded/meta-python \
+  /workdir/meta-openembedded/meta-networking \
+  /workdir/meta-raspberrypi \
+  /repo/yocto/meta-mihini \
+  "

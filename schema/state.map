@@ -1,0 +1,12 @@
+# treemgr mountpoint for the state container.
+#
+# Mounts a fresh RAM-backed handler at `state.*` so the schema mirror rule has
+# somewhere to publish the operational copy of every `state = true` config leaf.
+# Drop this file into the agent's treemgr maps directory (next to agentconfig.map
+# and ramstore.map) and `treemgr.build` will compile it into the CDB mapping.
+#
+# Format: first line is `treemgr <handler_module>`; the following lines map a
+# logical path to a handler path. An empty handler path mounts the whole handler.
+
+treemgr agent.treemgr.handlers.ramstore
+state=

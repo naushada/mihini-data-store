@@ -1,0 +1,24 @@
+# local.conf -- sample build configuration for the Mihini data-store image.
+#
+# Paths assume the container layout used by build.sh:
+#     /workdir = the workspace (poky, meta-*, downloads, sstate-cache, build, deploy)
+#     /repo    = this repository (contains yocto/meta-mihini and the source)
+# Adjust DL_DIR / SSTATE_DIR if you run bitbake natively instead of in the container.
+
+MACHINE ?= "raspberrypi3-64"
+DISTRO ?= "poky"
+PACKAGE_CLASSES ?= "package_ipk"
+
+EXTRA_IMAGE_FEATURES ?= "debug-tweaks"
+IMAGE_FSTYPES += "wic.bz2 tar.bz2"
+
+# Shared caches, so successive builds are incremental.
+DL_DIR = "/workdir/downloads"
+SSTATE_DIR = "/workdir/sstate-cache"
+
+# Raspberry Pi 3B specifics (see meta-raspberrypi docs).
+ENABLE_UART = "1"
+GPU_MEM = "16"
+
+# Accept the EULA for the Broadcom firmware/GPU blobs, required by meta-raspberrypi.
+ENABLE_DWC2_PERIPHERAL = "1"
